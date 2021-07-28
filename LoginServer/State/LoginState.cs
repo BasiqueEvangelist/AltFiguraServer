@@ -72,9 +72,17 @@ namespace AltFiguraServer.LoginServer.State
                 });
                 return;
             }
+
+            var token = SessionUtils.MintToken(Guid.Parse(response.Id));
+
+            var disconnectMsg = new TextChatComponent("This is the Figura Auth Server V2.0!\n") { Color = "aqua" };
+            disconnectMsg.Siblings.Add(new TextChatComponent("Here is your auth token.\n\n\n") { Color = "aqua" });
+            disconnectMsg.Siblings.Add(new TextChatComponent(token) { Color = "aqua", Obfuscated = true });
+            disconnectMsg.Siblings.Add(new TextChatComponent("(Just kidding! :D)") { Color = "aqua" });
+
             await connection.WritePacket(new LoginDisconnectPacket()
             {
-                Reason = new TextChatComponent("Logged in! You are " + username)
+                Reason = disconnectMsg
             });
             return;
         }
