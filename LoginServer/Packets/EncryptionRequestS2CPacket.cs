@@ -2,7 +2,7 @@ using System.Security.Cryptography;
 
 namespace AltFiguraServer.LoginServer.Packets
 {
-    public class EncryptionRequestPacket : IClientboundPacket
+    public class EncryptionRequestS2CPacket : IMinecraftS2CPacket
     {
         public int PacketID => 1;
 

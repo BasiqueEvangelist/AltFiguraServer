@@ -5,6 +5,6 @@ namespace AltFiguraServer.LoginServer.State
 {
     public interface IMCState
     {
-        Dictionary<int, Func<IServerboundPacket>> PacketMap { get; }
+        Dictionary<int, Func<IMinecraftC2SPacket>> PacketMap { get; }
     }
 }

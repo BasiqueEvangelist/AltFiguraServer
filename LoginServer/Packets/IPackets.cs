@@ -3,14 +3,14 @@ using AltFiguraServer.LoginServer.State;
 
 namespace AltFiguraServer.LoginServer
 {
-    public interface IServerboundPacket
+    public interface IMinecraftC2SPacket
     {
         void Read(MCDataReader mr);
 
         Task Handle(IMCState state);
     }
 
-    public interface IClientboundPacket
+    public interface IMinecraftS2CPacket
     {
         int PacketID { get; }
 

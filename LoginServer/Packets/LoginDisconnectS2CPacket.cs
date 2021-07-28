@@ -2,7 +2,7 @@ using AltFiguraServer.LoginServer.Chat;
 
 namespace AltFiguraServer.LoginServer.Packets
 {
-    public class LoginDisconnectPacket : IClientboundPacket
+    public class LoginDisconnectS2CPacket : IMinecraftS2CPacket
     {
         public int PacketID => 0;
 

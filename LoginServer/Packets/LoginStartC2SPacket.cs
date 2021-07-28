@@ -3,7 +3,7 @@ using AltFiguraServer.LoginServer.State;
 
 namespace AltFiguraServer.LoginServer.Packets
 {
-    public class LoginStartPacket : IServerboundPacket
+    public class LoginStartPacket : IMinecraftC2SPacket
     {
         public string Username { get; private set; }
 

@@ -19,10 +19,10 @@ namespace AltFiguraServer.LoginServer.State
             this.connection = connection;
         }
 
-        public Dictionary<int, Func<IServerboundPacket>> PacketMap => new()
+        public Dictionary<int, Func<IMinecraftC2SPacket>> PacketMap => new()
         {
             { 0, () => new LoginStartPacket() },
-            { 1, () => new EncryptionResponsePacket() },
+            { 1, () => new EncryptionResponseC2SPacket() },
         };
 
         public async Task OnLoginStart(LoginStartPacket packet)
@@ -35,7 +35,7 @@ namespace AltFiguraServer.LoginServer.State
             username = packet.Username;
             verifyToken = RandomNumberGenerator.GetInt32(int.MaxValue);
 
-            EncryptionRequestPacket erp = new()
+            EncryptionRequestS2CPacket erp = new()
             {
                 ServerID = "",
                 PrivateKey = AuthUtils.ServerKey.ExportSubjectPublicKeyInfo(),
@@ -45,12 +45,12 @@ namespace AltFiguraServer.LoginServer.State
             await connection.WritePacket(erp);
         }
 
-        public async Task OnEncryptionResponse(EncryptionResponsePacket packet)
+        public async Task OnEncryptionResponse(EncryptionResponseC2SPacket packet)
         {
             byte[] decryptedVerifyToken = AuthUtils.ServerKey.Decrypt(packet.VerifyToken, RSAEncryptionPadding.Pkcs1);
             if (!decryptedVerifyToken.SequenceEqual(BitConverter.GetBytes(verifyToken)))
             {
-                await connection.WritePacket(new LoginDisconnectPacket()
+                await connection.WritePacket(new LoginDisconnectS2CPacket()
                 {
                     Reason = new TextChatComponent("Invalid verify token")
                 });
@@ -66,7 +66,7 @@ namespace AltFiguraServer.LoginServer.State
             var response = await AuthUtils.HasPlayerJoined(username, hash);
             if (response == null)
             {
-                await connection.WritePacket(new LoginDisconnectPacket()
+                await connection.WritePacket(new LoginDisconnectS2CPacket()
                 {
                     Reason = new TextChatComponent("Authentication failed")
                 });
@@ -80,7 +80,7 @@ namespace AltFiguraServer.LoginServer.State
             disconnectMsg.Siblings.Add(new TextChatComponent(token) { Color = "aqua", Obfuscated = true });
             disconnectMsg.Siblings.Add(new TextChatComponent("(Just kidding! :D)") { Color = "aqua" });
 
-            await connection.WritePacket(new LoginDisconnectPacket()
+            await connection.WritePacket(new LoginDisconnectS2CPacket()
             {
                 Reason = disconnectMsg
             });

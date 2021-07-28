@@ -3,7 +3,7 @@ using AltFiguraServer.LoginServer.State;
 
 namespace AltFiguraServer.LoginServer.Packets
 {
-    public class EncryptionResponsePacket : IServerboundPacket
+    public class EncryptionResponseC2SPacket : IMinecraftC2SPacket
     {
         public byte[] SharedSecret { get; private set; }
         public byte[] VerifyToken { get; private set; }

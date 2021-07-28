@@ -3,7 +3,7 @@ using AltFiguraServer.LoginServer.State;
 
 namespace AltFiguraServer.LoginServer.Packets
 {
-    public class HandshakePacket : IServerboundPacket
+    public class HandshakeC2SPacket : IMinecraftC2SPacket
     {
         public int ProtocolVersion { get; private set; }
         public string ServerAddress { get; private set; }

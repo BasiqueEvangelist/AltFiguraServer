@@ -9,9 +9,9 @@ namespace AltFiguraServer.LoginServer.State
     {
         private readonly MinecraftConnection connection;
 
-        public Dictionary<int, Func<IServerboundPacket>> PacketMap { get; } = new()
+        public Dictionary<int, Func<IMinecraftC2SPacket>> PacketMap { get; } = new()
         {
-            { 0, () => new HandshakePacket() },
+            { 0, () => new HandshakeC2SPacket() },
         };
 
         public HandshakeState(MinecraftConnection connection)
@@ -19,7 +19,7 @@ namespace AltFiguraServer.LoginServer.State
             this.connection = connection;
         }
 
-        public async Task OnHandshake(HandshakePacket packet)
+        public async Task OnHandshake(HandshakeC2SPacket packet)
         {
             if (packet.NextState == 1)
             {

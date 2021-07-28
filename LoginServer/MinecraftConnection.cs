@@ -52,7 +52,7 @@ namespace AltFiguraServer.LoginServer
             }
         }
 
-        public async Task WritePacket(IClientboundPacket packet)
+        public async Task WritePacket(IMinecraftS2CPacket packet)
         {
             // TODO: improve method
             byte[] data;
