@@ -1,8 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net.WebSockets;
+﻿using System.Net.WebSockets;
 using System.Threading.Tasks;
+using AltFiguraServer.Protocol;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 
@@ -11,21 +9,23 @@ namespace AltFiguraServer.Controllers
     [ApiController]
     public class ConnectController : ControllerBase
     {
-        private readonly ILogger<ConnectController> logger;
+        private readonly ILogger<WebSocketConnection> connLogger;
 
-        public ConnectController(ILogger<ConnectController> logger)
+        public ConnectController(ILogger<WebSocketConnection> connLogger)
         {
-            this.logger = logger;
+            this.connLogger = connLogger;
         }
 
-        // [HttpGet]
-        // [Route("/connect/")]
-        // public async Task<IActionResult> Connect()
-        // {
-        //     if (!HttpContext.WebSockets.IsWebSocketRequest) return BadRequest();
+        [HttpGet]
+        [Route("/connect/")]
+        public async Task<IActionResult> Connect()
+        {
+            if (!HttpContext.WebSockets.IsWebSocketRequest) return BadRequest();
 
-        //     using WebSocket webSocket = await HttpContext.WebSockets.AcceptWebSocketAsync();
-
-        // }
+            using WebSocket webSocket = await HttpContext.WebSockets.AcceptWebSocketAsync();
+            WebSocketConnection connection = new(webSocket, connLogger);
+            await connection.Run();
+            return new EmptyResult();
+        }
     }
 }
