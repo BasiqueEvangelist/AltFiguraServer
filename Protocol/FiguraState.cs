@@ -1,14 +1,22 @@
 using System;
 using System.Collections.Generic;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading.Tasks;
 using AltFiguraServer.Data;
 using AltFiguraServer.Protocol.Packets;
+using Microsoft.Extensions.Logging;
+using Org.BouncyCastle.Asn1.Ocsp;
 
 namespace AltFiguraServer.Protocol
 {
     public class FiguraState : IFiguraState
     {
+        private const int MAXIMUM_DATA_SIZE = 100 * 1024;
+        private static readonly SHA256 sha256 = SHA256.Create();
+
         private readonly Database db;
+        private readonly ILogger<FiguraState> logger;
         private WebSocketConnection connection;
         private Guid playerId;
         private Database.User user;
@@ -27,9 +35,10 @@ namespace AltFiguraServer.Protocol
             ("figura_v1:ping", () => new PingC2SPacket())
         };
 
-        public FiguraState(Database db)
+        public FiguraState(Database db, ILogger<FiguraState> logger)
         {
             this.db = db;
+            this.logger = logger;
         }
 
         public void Attach(WebSocketConnection connection)
@@ -46,52 +55,100 @@ namespace AltFiguraServer.Protocol
 
         public async Task OnAvatarRequest(AvatarRequestC2SPacket packet)
         {
-            throw new NotImplementedException();
+            var data = await db.GetAvatarBytes(packet.RequestedAvatarID);
+            if (data != null)
+                await connection.WritePacket(new AvatarProvideS2CPacket() { ResponseData = data });
         }
 
         public async Task OnAvatarUpload(AvatarUploadC2SPacket packet)
         {
-            throw new NotImplementedException();
+            if (user.OwnedAvatars.Count >= 100)
+            {
+                await connection.WritePacket(new AvatarUploadS2CPacket() { ReturnCode = AvatarUploadS2CPacket.UploadReturnCode.TooManyAvatars });
+                return;
+            }
+            if (packet.AvatarData.Length == 0)
+            {
+                await connection.WritePacket(new AvatarUploadS2CPacket() { ReturnCode = AvatarUploadS2CPacket.UploadReturnCode.EmptyAvatar });
+                return;
+            }
+            if (await db.GetTotalUserDataSize(playerId) + packet.AvatarData.Length > MAXIMUM_DATA_SIZE)
+            {
+                await connection.WritePacket(new AvatarUploadS2CPacket() { ReturnCode = AvatarUploadS2CPacket.UploadReturnCode.NotEnoughSpace });
+                return;
+            }
+
+            Guid avatarId = Guid.NewGuid();
+
+            Database.Avatar avatar = new()
+            {
+                Uuid = avatarId,
+                Nbt = packet.AvatarData,
+                Hash = Encoding.UTF8.GetString(sha256.ComputeHash(packet.AvatarData)),
+                Tags = ""
+            };
+
+            await db.PostAvatar(user.Uuid, avatar);
+            user.OwnedAvatars.Add(avatar.Uuid);
+            user.TotalAvatarSize += avatar.Size;
+
+            await connection.WritePacket(new AvatarUploadS2CPacket()
+            {
+                ReturnCode = AvatarUploadS2CPacket.UploadReturnCode.Success,
+                AvatarId = avatarId
+            });
         }
 
         public async Task OnUserSetAvatar(UserSetAvatarC2SPacket packet)
         {
-            throw new NotImplementedException();
+            await db.SetUserAvatar(user.Uuid, packet.AvatarId, packet.ShouldDelete);
         }
 
         public async Task OnUserDeleteCurrentAvatar(UserDeleteCurrentAvatarC2SPacket packet)
         {
-            throw new NotImplementedException();
+            await db.SetUserAvatar(user.Uuid, Guid.Empty, true);
         }
 
         public async Task OnUserGetCurrentAvatar(UserGetCurrentAvatarC2SPacket packet)
         {
-            throw new NotImplementedException();
+            var data = await db.GetUserAvatarBytes(packet.RequestedPlayerID);
+            if (data != null)
+                await connection.WritePacket(new UserAvatarProvideS2CPacket()
+                {
+                    PlayerId = packet.RequestedPlayerID,
+                    AvatarData = data
+                });
         }
 
         public async Task OnUserGetCurrentAvatarHash(UserGetCurrentAvatarHashC2SPacket packet)
         {
-            throw new NotImplementedException();
+            var hash = await db.GetUserAvatarHash(packet.RequestedPlayerID);
+            if (hash != null)
+                await connection.WritePacket(new UserAvatarHashProvideS2CPacket()
+                {
+                    PlayerId = packet.RequestedPlayerID,
+                    AvatarHash = hash
+                });
         }
 
         public async Task OnUserEventSubscribe(UserEventSubscribeC2SPacket packet)
         {
-            throw new NotImplementedException();
+            logger.LogDebug("UserEventSubscribe");
         }
 
         public async Task OnUserEventUnsubscribe(UserEventUnsubscribeC2SPacket packet)
         {
-            throw new NotImplementedException();
+            logger.LogDebug("UserEventUnsubscribe");
         }
 
         public async Task OnChannelAvatarUpdate(ChannelAvatarUpdateC2SPacket packet)
         {
-            throw new NotImplementedException();
+            logger.LogDebug("ChannelAvatarUpdate");
         }
 
         public async Task OnPing(PingC2SPacket packet)
         {
-            throw new NotImplementedException();
+            logger.LogDebug("Ping");
         }
     }
 }

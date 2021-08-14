@@ -44,6 +44,115 @@ namespace AltFiguraServer.Data
             return user;
         }
 
+        public async Task<byte[]> GetAvatarBytes(Guid avatarId)
+        {
+            using var c = GetConnection();
+            return await c.QuerySingleOrDefaultAsync<byte[]>(
+                "SELECT nbt " +
+                "FROM avatar_data " +
+                "WHERE uuid = @AvatarId",
+                new { AvatarId = avatarId });
+        }
+
+        public async Task<byte[]> GetUserAvatarBytes(Guid userId)
+        {
+            using var c = GetConnection();
+            return await c.QuerySingleOrDefaultAsync<byte[]>(
+                "SELECT a.nbt " +
+                "FROM user_data u " +
+                "INNER JOIN avatar_data a " +
+                "ON u.current_avatar = a.uuid " +
+                "WHERE u.uuid = @UserId",
+                new { UserId = userId });
+        }
+
+        public async Task<string> GetUserAvatarHash(Guid userId)
+        {
+            using var c = GetConnection();
+            return await c.QuerySingleOrDefaultAsync<string>(
+                "SELECT a.hash " +
+                "FROM user_data u " +
+                "INNER JOIN avatar_data a " +
+                "ON u.current_avatar = a.uuid " +
+                "WHERE u.uuid = @UserId",
+                new { UserId = userId });
+        }
+
+        public async Task<int> GetTotalUserDataSize(Guid userId)
+        {
+            using var c = GetConnection();
+            return await c.QuerySingleOrDefaultAsync<int>(
+                "SELECT total_avatar_size " +
+                "FROM user_data " +
+                "WHERE uuid = @UserId",
+                new { UserId = userId }
+            );
+        }
+
+        public async Task PostAvatar(Guid userId, Avatar avatar)
+        {
+            using var c = GetConnection();
+            using var tx = await c.BeginTransactionAsync();
+
+            await c.ExecuteAsync(
+                "UPDATE user_data " +
+                "SET total_avatar_size = total_avatar_size + @Size, " +
+                "owned_avatars = CASE WHEN owned_avatars = \"\" THEN @AvatarId ELSE CONCAT(owned_avatars, \";\", @AvatarId) " +
+                "WHERE uuid = @UserId",
+                new { avatar.Size, AvatarId = avatar.Uuid, UserId = userId },
+                transaction: tx
+            );
+
+            await c.ExecuteAsync(
+                "INSERT INTO avatar_data " +
+                "(uuid, nbt, size, hash, tags) " +
+                "VALUES " +
+                "(@Uuid, @Nbt, @Size, @Hash, @Tags)",
+                avatar,
+                transaction: tx
+            );
+
+            await tx.CommitAsync();
+        }
+
+        public async Task SetUserAvatar(Guid userId, Guid avatarId, bool deleteOld = false)
+        {
+            using var c = GetConnection();
+            using var tx = await c.BeginTransactionAsync();
+
+            if (deleteOld)
+            {
+                await c.ExecuteAsync(
+                    "SELECT current_avatar " +
+                    "INTO @CurrentAvatar " +
+                    "FROM user_data " +
+                    "WHERE uuid = @UserId; " +
+
+                    "UPDATE user_data u " +
+                    "INNER JOIN avatar_data a " +
+                    "ON a.uuid = u.current_avatar " +
+                    "SET u.total_avatar_size = u.total_avatar_size - a.size, " +
+                    "owned_avatars = REPLACE(REPLACE(owned_avatars, a.uuid, \"\"), \",,\", \",\") " +
+                    "WHERE u.uuid = @UserId; " +
+
+                    "DELETE FROM avatar_data a " +
+                    "WHERE a.uuid = @CurrentAvatar",
+                    new { UserId = userId },
+                    transaction: tx
+                );
+            }
+
+            await c.ExecuteAsync(
+                "UPDATE user_data " +
+                "SET current_avatar = @AvatarId " +
+                "WHERE uuid = @UserId",
+                new { UserId = userId, AvatarId = avatarId },
+                transaction: tx
+            );
+
+            await tx.CommitAsync();
+        }
+
         MySqlConnection GetConnection() => new(connectionString);
 
         public class User
@@ -57,6 +166,15 @@ namespace AltFiguraServer.Data
             public byte[] TrustData { get; set; }
             public byte[] FavoriteData { get; set; }
             public byte[] Config { get; set; }
+        }
+
+        public class Avatar
+        {
+            public Guid Uuid { get; set; }
+            public byte[] Nbt { get; set; }
+            public int Size { get; set; }
+            public string Hash { get; set; }
+            public string Tags { get; set; }
         }
     }
 }

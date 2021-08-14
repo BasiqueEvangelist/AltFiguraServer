@@ -11,12 +11,12 @@ namespace AltFiguraServer.Controllers
     public class ConnectController : ControllerBase
     {
         private readonly ILogger<WebSocketConnection> connLogger;
-        private readonly Database db;
+        private readonly FiguraState state;
 
-        public ConnectController(ILogger<WebSocketConnection> connLogger, Database db)
+        public ConnectController(ILogger<WebSocketConnection> connLogger, FiguraState state)
         {
             this.connLogger = connLogger;
-            this.db = db;
+            this.state = state;
         }
 
         [HttpGet]
@@ -26,7 +26,7 @@ namespace AltFiguraServer.Controllers
             if (!HttpContext.WebSockets.IsWebSocketRequest) return BadRequest();
 
             using WebSocket webSocket = await HttpContext.WebSockets.AcceptWebSocketAsync();
-            WebSocketConnection connection = new(webSocket, connLogger, new FiguraState(db));
+            WebSocketConnection connection = new(webSocket, connLogger, state);
             await connection.Run();
             return new EmptyResult();
         }

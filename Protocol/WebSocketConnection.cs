@@ -46,6 +46,7 @@ namespace AltFiguraServer.Protocol
                     await ReadMessage();
                 }
             }
+            catch (EndOfStreamException) { }
             catch (Exception e)
             {
                 logger.LogError(e, "Encountered network error");
