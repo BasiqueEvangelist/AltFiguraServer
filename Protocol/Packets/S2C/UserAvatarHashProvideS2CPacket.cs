@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using System.Text;
 
-namespace AltFiguraServer.Protocol.Packets
+namespace AltFiguraServer.Protocol.Packets.S2C
 {
     public class UserAvatarHashProvideS2CPacket : IFiguraS2CPacket
     {

@@ -1,6 +1,6 @@
 using System.IO;
 
-namespace AltFiguraServer.Protocol.Packets
+namespace AltFiguraServer.Protocol.Packets.S2C
 {
     public class AvatarProvideS2CPacket : IFiguraS2CPacket
     {

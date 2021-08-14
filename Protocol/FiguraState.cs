@@ -5,6 +5,8 @@ using System.Text;
 using System.Threading.Tasks;
 using AltFiguraServer.Data;
 using AltFiguraServer.Protocol.Packets;
+using AltFiguraServer.Protocol.Packets.C2S;
+using AltFiguraServer.Protocol.Packets.S2C;
 using Microsoft.Extensions.Logging;
 using Org.BouncyCastle.Asn1.Ocsp;
 
