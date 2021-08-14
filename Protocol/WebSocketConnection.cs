@@ -15,9 +15,18 @@ namespace AltFiguraServer.Protocol
     {
         private readonly WebSocket ws;
         private readonly ILogger<WebSocketConnection> logger;
+        private IFiguraState state;
 
         public ProtocolRegistry Registry { get; } = new();
-        public IFiguraState CurrentState { get; set; }
+        public IFiguraState CurrentState
+        {
+            get => state;
+            set
+            {
+                value.Attach(this);
+                state = value;
+            }
+        }
 
         public WebSocketConnection(WebSocket ws, ILogger<WebSocketConnection> logger, IFiguraState state)
         {
