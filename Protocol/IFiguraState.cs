@@ -5,7 +5,7 @@ using AltFiguraServer.Protocol.Packets;
 
 namespace AltFiguraServer.Protocol
 {
-    public interface IFiguraState
+    public interface IFiguraState : IDisposable
     {
         List<(string, Func<IFiguraC2SPacket>)> PacketList { get; }
 

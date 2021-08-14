@@ -54,6 +54,7 @@ namespace AltFiguraServer.Protocol
             finally
             {
                 await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing socket", default);
+                CurrentState.Dispose();
             }
         }
 

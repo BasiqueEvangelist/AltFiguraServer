@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using AltFiguraServer.Data;
+using AltFiguraServer.Pings;
 using AltFiguraServer.Protocol.Packets;
 using AltFiguraServer.Protocol.Packets.C2S;
 using AltFiguraServer.Protocol.Packets.S2C;
@@ -22,6 +23,9 @@ namespace AltFiguraServer.Protocol
         private WebSocketConnection connection;
         private Guid playerId;
         private Database.User user;
+        private FiguraPeer peer;
+
+        public Guid PlayerId => playerId;
 
         public List<(string, Func<IFiguraC2SPacket>)> PacketList { get; } = new()
         {
@@ -53,6 +57,9 @@ namespace AltFiguraServer.Protocol
             this.playerId = playerId;
 
             user = await db.GetOrCreateUser(playerId);
+
+            peer = new FiguraPeer(connection, this);
+            P2PManager.RegisterPeer(peer);
         }
 
         public async Task OnAvatarRequest(AvatarRequestC2SPacket packet)
@@ -135,22 +142,40 @@ namespace AltFiguraServer.Protocol
 
         public async Task OnUserEventSubscribe(UserEventSubscribeC2SPacket packet)
         {
-            logger.LogDebug("UserEventSubscribe");
+            foreach (Guid target in packet.Targets)
+            {
+                P2PManager.GetPeer(target).Subscribe(peer);
+            }
         }
 
         public async Task OnUserEventUnsubscribe(UserEventUnsubscribeC2SPacket packet)
         {
-            logger.LogDebug("UserEventUnsubscribe");
+            foreach (Guid target in packet.Targets)
+            {
+                P2PManager.GetPeer(target).Unsubscribe(peer);
+            }
         }
 
         public async Task OnChannelAvatarUpdate(ChannelAvatarUpdateC2SPacket packet)
         {
-            logger.LogDebug("ChannelAvatarUpdate");
+            await peer.Publish(new ChannelAvatarUpdateS2CPacket()
+            {
+                SourceUser = playerId
+            });
         }
 
         public async Task OnPing(PingC2SPacket packet)
         {
-            logger.LogDebug("Ping");
+            await peer.Publish(new PingHandleS2CPacket()
+            {
+                SourceUser = playerId,
+                PingData = packet.Data
+            });
+        }
+
+        public void Dispose()
+        {
+            peer.Dispose();
         }
     }
 }
