@@ -1,13 +1,17 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using AltFiguraServer.Data;
 using AltFiguraServer.Protocol.Packets;
 
 namespace AltFiguraServer.Protocol
 {
     public class FiguraState : IFiguraState
     {
-        private readonly WebSocketConnection connection;
+        private readonly Database db;
+        private WebSocketConnection connection;
+        private Guid playerId;
+        private Database.User user;
 
         public List<(string, Func<IFiguraC2SPacket>)> PacketList { get; } = new()
         {
@@ -23,9 +27,21 @@ namespace AltFiguraServer.Protocol
             ("figura_v1:ping", () => new PingC2SPacket())
         };
 
-        public FiguraState(WebSocketConnection connection)
+        public FiguraState(Database db)
+        {
+            this.db = db;
+        }
+
+        public void Attach(WebSocketConnection connection)
         {
             this.connection = connection;
+        }
+
+        public async Task OnAuthenticated(Guid playerId)
+        {
+            this.playerId = playerId;
+
+            user = await db.GetOrCreateUser(playerId);
         }
 
         public async Task OnAvatarRequest(AvatarRequestC2SPacket packet)

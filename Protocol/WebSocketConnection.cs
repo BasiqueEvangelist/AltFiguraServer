@@ -1,11 +1,13 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Net.WebSockets;
 using System.Text;
 using System.Threading.Tasks;
 using AltFiguraServer.LoginServer;
 using AltFiguraServer.Protocol.Packets;
 using Microsoft.Extensions.Logging;
+using Microsoft.IdentityModel.JsonWebTokens;
 
 namespace AltFiguraServer.Protocol
 {
@@ -17,11 +19,11 @@ namespace AltFiguraServer.Protocol
         public ProtocolRegistry Registry { get; } = new();
         public IFiguraState CurrentState { get; set; }
 
-        public WebSocketConnection(WebSocket ws, ILogger<WebSocketConnection> logger)
+        public WebSocketConnection(WebSocket ws, ILogger<WebSocketConnection> logger, IFiguraState state)
         {
             this.ws = ws;
             this.logger = logger;
-            CurrentState = new FiguraState(this);
+            CurrentState = state;
         }
 
         public async Task Run()
@@ -93,8 +95,10 @@ namespace AltFiguraServer.Protocol
         private async Task<bool> Setup()
         {
             string jwt = Encoding.UTF8.GetString((await CollectMessage()).ToArray());
-            // if (!SessionUtils.ValidateToken(jwt, out var claims))
-            //     return false;
+            if (!SessionUtils.ValidateToken(jwt, out var token))
+                return false;
+
+            await CurrentState.OnAuthenticated(Guid.Parse(token.Subject));
 
             using (var registryMessageStream = await CollectMessage())
             using (var br = new BinaryReader(registryMessageStream))

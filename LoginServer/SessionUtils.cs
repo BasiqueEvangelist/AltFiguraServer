@@ -41,17 +41,17 @@ namespace AltFiguraServer.LoginServer
             return tokenHandler.WriteToken(token);
         }
 
-        public static bool ValidateToken(string token, out IEnumerable<Claim> claims)
+        public static bool ValidateToken(string token, out JwtSecurityToken validToken)
         {
             try
             {
                 tokenHandler.ValidateToken(token, validationParameters, out var validatedToken);
-                claims = ((JwtSecurityToken)validatedToken).Claims;
+                validToken = (JwtSecurityToken)validatedToken;
                 return true;
             }
             catch (Exception)
             {
-                claims = null;
+                validToken = null;
                 return false;
             }
         }

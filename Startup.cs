@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using AltFiguraServer.Data;
 using AltFiguraServer.LoginServer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -28,6 +29,7 @@ namespace AltFiguraServer
         {
             services.AddControllers();
             services.AddHostedService<FiguraLoginServer>();
+            services.AddSingleton(provider => new Database(Configuration.GetConnectionString("MySql")));
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
