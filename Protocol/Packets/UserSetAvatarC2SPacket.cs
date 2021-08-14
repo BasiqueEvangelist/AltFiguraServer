@@ -12,9 +12,7 @@ namespace AltFiguraServer.Protocol.Packets
 
         public void Read(BinaryReader br)
         {
-            string idString = Encoding.UTF8.GetString(br.ReadBytes(br.ReadInt32()));
-            AvatarId = Guid.Parse(idString);
-
+            AvatarId = br.ReadGuid();
             ShouldDelete = br.ReadSByte() == 1;
         }
 

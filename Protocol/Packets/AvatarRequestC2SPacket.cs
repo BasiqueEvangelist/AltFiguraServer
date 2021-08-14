@@ -11,7 +11,7 @@ namespace AltFiguraServer.Protocol.Packets
 
         public void Read(BinaryReader br)
         {
-
+            RequestedAvatarID = br.ReadGuid();
         }
 
         public Task Handle(IFiguraState state)

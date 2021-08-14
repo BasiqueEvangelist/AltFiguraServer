@@ -11,8 +11,7 @@ namespace AltFiguraServer.Protocol.Packets
 
         public void Read(BinaryReader br)
         {
-            string idString = Encoding.UTF8.GetString(br.ReadBytes(br.ReadInt32()));
-            RequestedPlayerID = Guid.Parse(idString);
+            RequestedPlayerID = br.ReadGuid();
         }
 
         public Task Handle(IFiguraState state)

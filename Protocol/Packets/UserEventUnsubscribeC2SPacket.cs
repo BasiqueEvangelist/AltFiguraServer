@@ -16,8 +16,7 @@ namespace AltFiguraServer.Protocol.Packets
             Targets = new Guid[total];
             for (int i = 0; i < total; i++)
             {
-                string idString = Encoding.UTF8.GetString(br.ReadBytes(br.ReadInt32()));
-                Targets[i] = Guid.Parse(idString);
+                Targets[i] = br.ReadGuid();
             }
         }
 
