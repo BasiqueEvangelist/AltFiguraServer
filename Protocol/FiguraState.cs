@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
@@ -64,6 +65,15 @@ namespace AltFiguraServer.Protocol
 
         public async Task OnAvatarRequest(AvatarRequestC2SPacket packet)
         {
+            if (!DefaultRateLimiters.AvatarsRequested.TryPerform(playerId, 1))
+            {
+                await connection.WritePacket(new ErrorS2CPacket()
+                {
+                    Code = ErrorS2CPacket.ErrorCode.AvatarsRequestedRateLimitHit
+                });
+                return;
+            }
+
             var data = await db.GetAvatarBytes(packet.RequestedAvatarID);
             if (data != null)
                 await connection.WritePacket(new AvatarProvideS2CPacket() { ResponseData = data });
@@ -71,6 +81,15 @@ namespace AltFiguraServer.Protocol
 
         public async Task OnAvatarUpload(AvatarUploadC2SPacket packet)
         {
+            if (!DefaultRateLimiters.AvatarsUploaded.TryPerform(playerId, 1))
+            {
+                await connection.WritePacket(new ErrorS2CPacket()
+                {
+                    Code = ErrorS2CPacket.ErrorCode.AvatarsUploadedRateLimitHit
+                });
+                return;
+            }
+
             if (user.OwnedAvatars.Count >= 100)
             {
                 await connection.WritePacket(new AvatarUploadS2CPacket() { ReturnCode = AvatarUploadS2CPacket.UploadReturnCode.TooManyAvatars });
@@ -120,6 +139,15 @@ namespace AltFiguraServer.Protocol
 
         public async Task OnUserGetCurrentAvatar(UserGetCurrentAvatarC2SPacket packet)
         {
+            if (!DefaultRateLimiters.AvatarsRequested.TryPerform(playerId, 1))
+            {
+                await connection.WritePacket(new ErrorS2CPacket()
+                {
+                    Code = ErrorS2CPacket.ErrorCode.AvatarsRequestedRateLimitHit
+                });
+                return;
+            }
+
             var data = await db.GetUserAvatarBytes(packet.RequestedPlayerID);
             if (data != null)
                 await connection.WritePacket(new UserAvatarProvideS2CPacket()
@@ -166,6 +194,24 @@ namespace AltFiguraServer.Protocol
 
         public async Task OnPing(PingC2SPacket packet)
         {
+            if (!DefaultRateLimiters.Pings.TryPerform(playerId, 1))
+            {
+                await connection.WritePacket(new ErrorS2CPacket()
+                {
+                    Code = ErrorS2CPacket.ErrorCode.PingsRateLimitHit
+                });
+                return;
+            }
+
+            if (!DefaultRateLimiters.PingBytes.TryPerform(playerId, packet.Data.Length - sizeof(short)))
+            {
+                await connection.WritePacket(new ErrorS2CPacket()
+                {
+                    Code = ErrorS2CPacket.ErrorCode.AvatarsRequestedRateLimitHit
+                });
+                return;
+            }
+
             await peer.Publish(new PingHandleS2CPacket()
             {
                 SourceUser = playerId,
@@ -173,9 +219,32 @@ namespace AltFiguraServer.Protocol
             });
         }
 
+        public async Task<bool> OnMessageReceived(MemoryStream ms)
+        {
+            if (!DefaultRateLimiters.BytesSent.TryPerform(playerId, (int)ms.Length))
+            {
+                await connection.WritePacket(new ErrorS2CPacket()
+                {
+                    Code = ErrorS2CPacket.ErrorCode.ByteRateLimitHit
+                });
+                return false;
+            }
+
+            if (!DefaultRateLimiters.MessagesSent.TryPerform(playerId, 1))
+            {
+                await connection.WritePacket(new ErrorS2CPacket()
+                {
+                    Code = ErrorS2CPacket.ErrorCode.MessageRateLimitHit
+                });
+                return false;
+            }
+
+            return true;
+        }
+
         public void Dispose()
         {
-            peer.Dispose();
+            peer?.Dispose();
         }
     }
 }

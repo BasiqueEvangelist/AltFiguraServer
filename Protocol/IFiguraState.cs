@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Threading.Tasks;
 using AltFiguraServer.Protocol.Packets;
 
@@ -12,5 +13,7 @@ namespace AltFiguraServer.Protocol
         void Attach(WebSocketConnection connection);
 
         Task OnAuthenticated(Guid playerId);
+
+        Task<bool> OnMessageReceived(MemoryStream ms);
     }
 }

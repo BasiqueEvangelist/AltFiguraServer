@@ -53,7 +53,8 @@ namespace AltFiguraServer.Protocol
             }
             finally
             {
-                await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing socket", default);
+                if (ws.State != WebSocketState.Aborted && ws.State != WebSocketState.Closed)
+                    await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing socket", default);
                 CurrentState.Dispose();
             }
         }
@@ -87,6 +88,11 @@ namespace AltFiguraServer.Protocol
             using (var dataStream = await CollectMessage())
             using (var br = new BinaryReader(dataStream))
             {
+                if (!await CurrentState.OnMessageReceived(dataStream))
+                {
+                    return;
+                }
+
                 int packetId = br.ReadSByte() - sbyte.MinValue - 1;
                 if (CurrentState.PacketList.Count <= packetId)
                 {
@@ -144,6 +150,12 @@ namespace AltFiguraServer.Protocol
             byte[] buffer = new byte[1024];
             do
             {
+                if (ms.Length > 200 * 1024)
+                {
+                    logger.LogError("Websockets message is more than 200 KB! Something has gone terribly wrong.");
+                    throw new EndOfStreamException();
+                }
+
                 if (ws.CloseStatus != null) throw new EndOfStreamException();
                 result = await ws.ReceiveAsync(buffer.AsMemory(), default);
                 ms.Write(buffer, 0, result.Count);
