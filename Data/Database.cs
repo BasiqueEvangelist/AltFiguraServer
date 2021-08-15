@@ -1,47 +1,42 @@
 using System;
 using System.Threading.Tasks;
+using AltFiguraServer.Protocol.Packets.S2C;
 using Dapper;
-using MySql.Data.MySqlClient;
+using MySqlConnector;
 
 namespace AltFiguraServer.Data
 {
     public class Database
     {
+        private const int MAXIMUM_DATA_SIZE = 100 * 1024;
+
         private readonly string connectionString;
 
         public Database(string connectionString)
         {
-            this.connectionString = connectionString;
+            this.connectionString = connectionString + ";TreatTinyAsBoolean=false;Allow User Variables=true";
         }
 
-        public async Task<User> GetOrCreateUser(Guid id)
+        public async Task CreateUserIfNeeded(Guid id)
         {
             using var c = GetConnection();
 
-            var user = await c.QuerySingleOrDefaultAsync<User>(
-                "SELECT * " +
-                "FROM user_data " +
-                "WHERE uuid = @id",
-                 new { id });
-            if (user == null)
-            {
-                user = await c.QuerySingle(
-                    "INSERT INTO user_data " +
-                    "(uuid, current_avatar, total_avatar_size, owned_avatars, owned_packs, karma, trust_data, favorite_data, config) " +
-                    "VALUES " +
-                    "(@Uuid, @OwnedAvatars, @OwnedPacks, @Karma)",
-                    new User()
-                    {
-                        Uuid = id,
-                        OwnedAvatars = new GuidList(),
-                        OwnedPacks = new GuidList(),
-                        Karma = 0,
-                        TrustData = Array.Empty<byte>(),
-                        FavoriteData = Array.Empty<byte>(),
-                        Config = Array.Empty<byte>(),
-                    });
-            }
-            return user;
+            await c.ExecuteAsync(
+                "INSERT INTO user_data " +
+                "(uuid, current_avatar, total_avatar_size, owned_avatars, owned_packs, karma, trust_data, favorite_data, config) " +
+                "VALUES " +
+                "(@Uuid, @CurrentAvatar, @TotalAvatarSize, @OwnedAvatars, @OwnedPacks, @Karma, @TrustData, @FavoriteData, @Config) " +
+                "ON DUPLICATE KEY UPDATE uuid=uuid",
+                new User()
+                {
+                    Uuid = id,
+                    OwnedAvatars = new GuidList(),
+                    OwnedPacks = new GuidList(),
+                    Karma = 0,
+                    TrustData = Array.Empty<byte>(),
+                    FavoriteData = Array.Empty<byte>(),
+                    Config = Array.Empty<byte>(),
+                });
         }
 
         public async Task<byte[]> GetAvatarBytes(Guid avatarId)
@@ -89,15 +84,32 @@ namespace AltFiguraServer.Data
             );
         }
 
-        public async Task PostAvatar(Guid userId, Avatar avatar)
+        public async Task<AvatarUploadS2CPacket.UploadReturnCode> PostAvatar(Guid userId, Avatar avatar)
         {
             using var c = GetConnection();
+            await c.OpenAsync();
             using var tx = await c.BeginTransactionAsync();
+
+            var user = await c.QuerySingleAsync<User>(
+                "SELECT total_avatar_size TotalAvatarSize, owned_avatars OwnedAvatars " +
+                "FROM user_data " +
+                "WHERE uuid = @UserId",
+                new { UserId = userId },
+                transaction: tx
+            );
+            if (user.OwnedAvatars.Count >= 100)
+            {
+                return AvatarUploadS2CPacket.UploadReturnCode.TooManyAvatars;
+            }
+            if (user.TotalAvatarSize + avatar.Size > MAXIMUM_DATA_SIZE)
+            {
+                return AvatarUploadS2CPacket.UploadReturnCode.NotEnoughSpace;
+            }
 
             await c.ExecuteAsync(
                 "UPDATE user_data " +
                 "SET total_avatar_size = total_avatar_size + @Size, " +
-                "owned_avatars = CASE WHEN owned_avatars = \"\" THEN @AvatarId ELSE CONCAT(owned_avatars, \";\", @AvatarId) " +
+                "owned_avatars = IF(owned_avatars = '', @AvatarId, CONCAT(owned_avatars, ';', @AvatarId)) " +
                 "WHERE uuid = @UserId",
                 new { avatar.Size, AvatarId = avatar.Uuid, UserId = userId },
                 transaction: tx
@@ -113,30 +125,32 @@ namespace AltFiguraServer.Data
             );
 
             await tx.CommitAsync();
+            return AvatarUploadS2CPacket.UploadReturnCode.Success;
         }
 
         public async Task SetUserAvatar(Guid userId, Guid avatarId, bool deleteOld = false)
         {
             using var c = GetConnection();
+            await c.OpenAsync();
             using var tx = await c.BeginTransactionAsync();
 
             if (deleteOld)
             {
                 await c.ExecuteAsync(
-                    "SELECT current_avatar " +
-                    "INTO @CurrentAvatar " +
-                    "FROM user_data " +
-                    "WHERE uuid = @UserId; " +
+                    @"SELECT current_avatar
+                    INTO @CurrentAvatar
+                    FROM user_data
+                    WHERE uuid = @UserId;
 
-                    "UPDATE user_data u " +
-                    "INNER JOIN avatar_data a " +
-                    "ON a.uuid = u.current_avatar " +
-                    "SET u.total_avatar_size = u.total_avatar_size - a.size, " +
-                    "owned_avatars = REPLACE(REPLACE(owned_avatars, a.uuid, \"\"), \",,\", \",\") " +
-                    "WHERE u.uuid = @UserId; " +
+                    UPDATE user_data u
+                    INNER JOIN avatar_data a
+                    ON a.uuid = u.current_avatar
+                    SET u.total_avatar_size = u.total_avatar_size - a.size,
+                    owned_avatars = REPLACE(REPLACE(owned_avatars, a.uuid, ''), ',,', ',')
+                    WHERE u.uuid = @UserId;
 
-                    "DELETE FROM avatar_data a " +
-                    "WHERE a.uuid = @CurrentAvatar",
+                    DELETE FROM avatar_data
+                    WHERE uuid = @CurrentAvatar",
                     new { UserId = userId },
                     transaction: tx
                 );

@@ -10,20 +10,17 @@ using AltFiguraServer.Protocol.Packets;
 using AltFiguraServer.Protocol.Packets.C2S;
 using AltFiguraServer.Protocol.Packets.S2C;
 using Microsoft.Extensions.Logging;
-using Org.BouncyCastle.Asn1.Ocsp;
 
 namespace AltFiguraServer.Protocol
 {
     public class FiguraState : IFiguraState
     {
-        private const int MAXIMUM_DATA_SIZE = 100 * 1024;
         private static readonly SHA256 sha256 = SHA256.Create();
 
         private readonly Database db;
         private readonly ILogger<FiguraState> logger;
         private WebSocketConnection connection;
         private Guid playerId;
-        private Database.User user;
         private FiguraPeer peer;
 
         public Guid PlayerId => playerId;
@@ -57,7 +54,7 @@ namespace AltFiguraServer.Protocol
         {
             this.playerId = playerId;
 
-            user = await db.GetOrCreateUser(playerId);
+            await db.CreateUserIfNeeded(playerId);
 
             peer = new FiguraPeer(connection, this);
             P2PManager.RegisterPeer(peer);
@@ -90,19 +87,9 @@ namespace AltFiguraServer.Protocol
                 return;
             }
 
-            if (user.OwnedAvatars.Count >= 100)
-            {
-                await connection.WritePacket(new AvatarUploadS2CPacket() { ReturnCode = AvatarUploadS2CPacket.UploadReturnCode.TooManyAvatars });
-                return;
-            }
             if (packet.AvatarData.Length == 0)
             {
                 await connection.WritePacket(new AvatarUploadS2CPacket() { ReturnCode = AvatarUploadS2CPacket.UploadReturnCode.EmptyAvatar });
-                return;
-            }
-            if (await db.GetTotalUserDataSize(playerId) + packet.AvatarData.Length > MAXIMUM_DATA_SIZE)
-            {
-                await connection.WritePacket(new AvatarUploadS2CPacket() { ReturnCode = AvatarUploadS2CPacket.UploadReturnCode.NotEnoughSpace });
                 return;
             }
 
@@ -116,25 +103,23 @@ namespace AltFiguraServer.Protocol
                 Tags = ""
             };
 
-            await db.PostAvatar(user.Uuid, avatar);
-            user.OwnedAvatars.Add(avatar.Uuid);
-            user.TotalAvatarSize += avatar.Size;
+            var errCode = await db.PostAvatar(playerId, avatar);
 
             await connection.WritePacket(new AvatarUploadS2CPacket()
             {
-                ReturnCode = AvatarUploadS2CPacket.UploadReturnCode.Success,
+                ReturnCode = errCode,
                 AvatarId = avatarId
             });
         }
 
         public async Task OnUserSetAvatar(UserSetAvatarC2SPacket packet)
         {
-            await db.SetUserAvatar(user.Uuid, packet.AvatarId, packet.ShouldDelete);
+            await db.SetUserAvatar(playerId, packet.AvatarId, packet.ShouldDelete);
         }
 
         public async Task OnUserDeleteCurrentAvatar(UserDeleteCurrentAvatarC2SPacket packet)
         {
-            await db.SetUserAvatar(user.Uuid, Guid.Empty, true);
+            await db.SetUserAvatar(playerId, Guid.Empty, true);
         }
 
         public async Task OnUserGetCurrentAvatar(UserGetCurrentAvatarC2SPacket packet)
