@@ -21,12 +21,12 @@ namespace AltFiguraServer.LoginServer.State
 
         public async Task OnHandshake(HandshakeC2SPacket packet)
         {
-            if (packet.NextState == 1)
+            connection.CurrentState = packet.NextState switch
             {
-                throw new NotImplementedException();
-            }
-
-            connection.CurrentState = new LoginState(connection);
+                1 => new StatusState(connection, packet.ProtocolVersion),
+                2 => new LoginState(connection),
+                _ => throw new NotImplementedException()
+            };
         }
     }
 }

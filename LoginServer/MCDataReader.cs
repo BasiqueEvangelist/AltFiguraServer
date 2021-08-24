@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.Collections;
 using System.IO;
 using System.Text;
@@ -17,11 +18,11 @@ namespace AltFiguraServer.LoginServer
 
         public ushort ReadUInt16()
         {
-            ushort value = br.ReadUInt16();
-            if (BitConverter.IsLittleEndian)
-                return (ushort)(((value & 0xFF) << 8) | (value >> 8));
-            else
-                return value;
+            return BinaryPrimitives.ReadUInt16BigEndian(br.ReadBytes(2));
+        }
+        public long ReadInt64()
+        {
+            return BinaryPrimitives.ReadInt64BigEndian(br.ReadBytes(8));
         }
 
         public int ReadVarInt32()

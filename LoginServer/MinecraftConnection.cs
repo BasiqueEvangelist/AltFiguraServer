@@ -96,7 +96,8 @@ namespace AltFiguraServer.LoginServer
             var (packetId, packetIdLen) = await ReadVarInt32(stream);
 
             byte[] packetData = new byte[packetLength - packetIdLen];
-            await stream.ReadAsync(packetData.AsMemory());
+            if (packetData.Length > 0)
+                await stream.ReadAsync(packetData.AsMemory());
 
             if (!CurrentState.PacketMap.TryGetValue(packetId, out var packetFactory))
             {

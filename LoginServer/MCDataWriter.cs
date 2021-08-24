@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
 using System.Text;
 
@@ -16,10 +17,16 @@ namespace AltFiguraServer.LoginServer
 
         public void Write(ushort value)
         {
-            if (BitConverter.IsLittleEndian)
-                bw.Write((ushort)(((value & 0xFF) << 8) | (value >> 8)));
-            else
-                bw.Write(value);
+            Span<byte> data = stackalloc byte[2];
+            BinaryPrimitives.WriteUInt16BigEndian(data, value);
+            bw.Write(data);
+        }
+
+        public void Write(long value)
+        {
+            Span<byte> data = stackalloc byte[8];
+            BinaryPrimitives.WriteInt64BigEndian(data, value);
+            bw.Write(data);
         }
 
         public void WriteVarInt32(int value)
